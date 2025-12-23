@@ -40,25 +40,24 @@ const Index = () => {
           </div>
         </header>
 
-        {/* Hero Section */}
-        <section className="container mx-auto px-4 py-12 text-center">
-          <div className="max-w-3xl mx-auto space-y-4" style={{ animation: 'fade-in 0.6s ease-out forwards' }}>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground">
+        {/* Hero Section - Compact */}
+        <section className="container mx-auto px-4 py-6 text-center">
+          <div className="max-w-3xl mx-auto space-y-2">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground">
               Navier-Stokes
-              <span className="block text-primary">Equation Solver</span>
+              <span className="text-primary"> Equation Solver</span>
             </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Explore computational fluid dynamics with an interactive 2D simulation 
-              of the incompressible Navier-Stokes equations
+            <p className="text-sm text-muted-foreground">
+              Interactive 2D simulation of incompressible fluid dynamics
             </p>
           </div>
         </section>
 
         {/* Main Content */}
-        <main className="container mx-auto px-4 pb-16">
-          <div className="grid lg:grid-cols-3 gap-8">
+        <main className="container mx-auto px-4 pb-8">
+          <div className="grid lg:grid-cols-3 gap-6">
             {/* Simulation Area */}
-            <div className="lg:col-span-2 space-y-4" style={{ animation: 'fade-in 0.6s ease-out 0.2s forwards', opacity: 0 }}>
+            <div className="lg:col-span-2 space-y-4">
               <div className="glass-panel p-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-foreground">
@@ -72,11 +71,11 @@ const Index = () => {
                     {isRunning ? 'Running' : 'Paused'}
                   </span>
                 </div>
-                <div className="flex justify-center bg-background/50 rounded-lg p-4">
+                <div className="flex justify-center bg-background/50 rounded-lg p-2">
                   <FluidSimulationCanvas
                     key={resetKey}
-                    width={500}
-                    height={500}
+                    width={450}
+                    height={450}
                     reynolds={reynolds}
                     resolution={resolution}
                     isRunning={isRunning}
@@ -87,7 +86,7 @@ const Index = () => {
             </div>
 
             {/* Controls Panel */}
-            <div className="space-y-6" style={{ animation: 'fade-in 0.6s ease-out 0.4s forwards', opacity: 0 }}>
+            <div className="space-y-4">
               <SimulationControls
                 reynolds={reynolds}
                 setReynolds={setReynolds}
@@ -103,7 +102,7 @@ const Index = () => {
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-border/50 py-8">
+        <footer className="border-t border-border/50 py-6">
           <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
             <p>
               Solving the millennium prize problem, one timestep at a time

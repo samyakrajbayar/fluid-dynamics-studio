@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 
 interface FluidSimulationCanvasProps {
   width: number;
@@ -17,8 +17,8 @@ const FluidSimulationCanvas = ({
 }: FluidSimulationCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
-  const timeRef = useRef(0);
   const velocityFieldRef = useRef<{ u: Float32Array; v: Float32Array } | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
   const initializeField = useCallback((nx: number, ny: number) => {
     const size = nx * ny;
@@ -37,6 +37,7 @@ const FluidSimulationCanvas = ({
     }
 
     velocityFieldRef.current = { u, v };
+    setInitialized(true);
   }, []);
 
   const updateSimulation = useCallback((nx: number, ny: number, dt: number, nu: number) => {
@@ -70,18 +71,14 @@ const FluidSimulationCanvas = ({
 
     // Apply boundary conditions
     for (let i = 0; i < nx; i++) {
-      // Top lid
       newU[(ny - 1) * nx + i] = 1.0;
       newV[(ny - 1) * nx + i] = 0;
-      // Bottom wall
       newU[i] = 0;
       newV[i] = 0;
     }
     for (let j = 0; j < ny; j++) {
-      // Left wall
       newU[j * nx] = 0;
       newV[j * nx] = 0;
-      // Right wall
       newU[j * nx + (nx - 1)] = 0;
       newV[j * nx + (nx - 1)] = 0;
     }
@@ -92,10 +89,10 @@ const FluidSimulationCanvas = ({
   const velocityToColor = (magnitude: number, maxMag: number): [number, number, number] => {
     const normalized = Math.min(magnitude / maxMag, 1);
     
-    // Cyan to blue to purple gradient
-    const r = Math.floor(normalized * 150);
-    const g = Math.floor(200 - normalized * 100);
-    const b = Math.floor(255 - normalized * 55);
+    // Dark blue to cyan to bright cyan gradient
+    const r = Math.floor(20 + normalized * 80);
+    const g = Math.floor(60 + normalized * 180);
+    const b = Math.floor(120 + normalized * 135);
     
     return [r, g, b];
   };
@@ -138,30 +135,29 @@ const FluidSimulationCanvas = ({
     ctx.putImageData(imageData, 0, 0);
 
     // Draw velocity vectors
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 1.5;
 
-    const vectorStep = Math.max(2, Math.floor(nx / 20));
+    const vectorStep = Math.max(2, Math.floor(nx / 15));
     for (let j = vectorStep; j < ny - vectorStep; j += vectorStep) {
       for (let i = vectorStep; i < nx - vectorStep; i += vectorStep) {
         const idx = j * nx + i;
         const x = (i + 0.5) * cellWidth;
         const y = height - (j + 0.5) * cellHeight;
 
-        const scale = cellWidth * vectorStep * 0.8;
+        const scale = cellWidth * vectorStep * 0.6;
         const vx = u[idx] * scale;
         const vy = -v[idx] * scale;
 
         const mag = Math.sqrt(vx * vx + vy * vy);
-        if (mag > 0.5) {
+        if (mag > 0.3) {
           ctx.beginPath();
           ctx.moveTo(x, y);
           ctx.lineTo(x + vx, y + vy);
           ctx.stroke();
 
-          // Arrow head
           const angle = Math.atan2(vy, vx);
-          const headLen = 4;
+          const headLen = 5;
           ctx.beginPath();
           ctx.moveTo(x + vx, y + vy);
           ctx.lineTo(
@@ -179,11 +175,28 @@ const FluidSimulationCanvas = ({
     }
   }, [width, height]);
 
+  // Initialize field on mount and resolution change
   useEffect(() => {
     initializeField(resolution, resolution);
   }, [resolution, initializeField]);
 
+  // Render initial state immediately after initialization
   useEffect(() => {
+    if (!initialized) return;
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    render(ctx, resolution, resolution);
+  }, [initialized, resolution, render]);
+
+  // Animation loop
+  useEffect(() => {
+    if (!isRunning || !initialized) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -194,26 +207,19 @@ const FluidSimulationCanvas = ({
     const dt = 0.1;
 
     const animate = () => {
-      if (isRunning) {
-        updateSimulation(resolution, resolution, dt, nu);
-        timeRef.current += dt;
-      }
-
+      updateSimulation(resolution, resolution, dt, nu);
       render(ctx, resolution, resolution);
-
-      if (isRunning) {
-        animationRef.current = requestAnimationFrame(animate);
-      }
+      animationRef.current = requestAnimationFrame(animate);
     };
 
-    animate();
+    animationRef.current = requestAnimationFrame(animate);
 
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isRunning, reynolds, resolution, updateSimulation, render]);
+  }, [isRunning, initialized, reynolds, resolution, updateSimulation, render]);
 
   return (
     <canvas
@@ -221,7 +227,6 @@ const FluidSimulationCanvas = ({
       width={width}
       height={height}
       className="rounded-lg border border-border"
-      style={{ imageRendering: 'pixelated' }}
     />
   );
 };
