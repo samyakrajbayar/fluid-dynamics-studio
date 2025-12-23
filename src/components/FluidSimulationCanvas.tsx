@@ -40,14 +40,20 @@ const FluidSimulationCanvas = ({
     setInitialized(true);
   }, []);
 
-  const updateSimulation = useCallback((nx: number, ny: number, dt: number, nu: number) => {
+  const updateSimulation = useCallback((nx: number, ny: number, nu: number) => {
     if (!velocityFieldRef.current) return;
 
     const { u, v } = velocityFieldRef.current;
     const newU = new Float32Array(u.length);
     const newV = new Float32Array(v.length);
 
-    // Simplified Navier-Stokes update (diffusion + advection)
+    const dx = 1.0 / nx;
+    const dy = 1.0 / ny;
+    
+    // CFL condition for stability
+    const dt = Math.min(0.25 * dx * dx / nu, 0.1 * dx);
+
+    // Navier-Stokes update with proper grid spacing
     for (let j = 1; j < ny - 1; j++) {
       for (let i = 1; i < nx - 1; i++) {
         const idx = j * nx + i;
@@ -56,29 +62,45 @@ const FluidSimulationCanvas = ({
         const idxD = (j - 1) * nx + i;
         const idxU = (j + 1) * nx + i;
 
-        // Diffusion (viscosity)
-        const diffU = nu * (u[idxL] + u[idxR] + u[idxD] + u[idxU] - 4 * u[idx]);
-        const diffV = nu * (v[idxL] + v[idxR] + v[idxD] + v[idxU] - 4 * v[idx]);
+        // Diffusion (Laplacian with proper grid spacing)
+        const d2udx2 = (u[idxL] - 2 * u[idx] + u[idxR]) / (dx * dx);
+        const d2udy2 = (u[idxD] - 2 * u[idx] + u[idxU]) / (dy * dy);
+        const d2vdx2 = (v[idxL] - 2 * v[idx] + v[idxR]) / (dx * dx);
+        const d2vdy2 = (v[idxD] - 2 * v[idx] + v[idxU]) / (dy * dy);
 
-        // Advection (simplified upwind)
-        const advU = -u[idx] * (u[idxR] - u[idxL]) / 2 - v[idx] * (u[idxU] - u[idxD]) / 2;
-        const advV = -u[idx] * (v[idxR] - v[idxL]) / 2 - v[idx] * (v[idxU] - v[idxD]) / 2;
+        // Advection (upwind scheme for stability)
+        const dudx = u[idx] > 0 
+          ? (u[idx] - u[idxL]) / dx 
+          : (u[idxR] - u[idx]) / dx;
+        const dudy = v[idx] > 0 
+          ? (u[idx] - u[idxD]) / dy 
+          : (u[idxU] - u[idx]) / dy;
+        const dvdx = u[idx] > 0 
+          ? (v[idx] - v[idxL]) / dx 
+          : (v[idxR] - v[idx]) / dx;
+        const dvdy = v[idx] > 0 
+          ? (v[idx] - v[idxD]) / dy 
+          : (v[idxU] - v[idx]) / dy;
 
-        newU[idx] = u[idx] + dt * (diffU + advU);
-        newV[idx] = v[idx] + dt * (diffV + advV);
+        newU[idx] = u[idx] + dt * (nu * (d2udx2 + d2udy2) - u[idx] * dudx - v[idx] * dudy);
+        newV[idx] = v[idx] + dt * (nu * (d2vdx2 + d2vdy2) - u[idx] * dvdx - v[idx] * dvdy);
       }
     }
 
     // Apply boundary conditions
     for (let i = 0; i < nx; i++) {
+      // Top lid moves to the right
       newU[(ny - 1) * nx + i] = 1.0;
       newV[(ny - 1) * nx + i] = 0;
+      // Bottom wall
       newU[i] = 0;
       newV[i] = 0;
     }
     for (let j = 0; j < ny; j++) {
+      // Left wall
       newU[j * nx] = 0;
       newV[j * nx] = 0;
+      // Right wall
       newU[j * nx + (nx - 1)] = 0;
       newV[j * nx + (nx - 1)] = 0;
     }
@@ -204,10 +226,12 @@ const FluidSimulationCanvas = ({
     if (!ctx) return;
 
     const nu = 1 / reynolds;
-    const dt = 0.1;
 
     const animate = () => {
-      updateSimulation(resolution, resolution, dt, nu);
+      // Run multiple iterations per frame for faster convergence
+      for (let i = 0; i < 5; i++) {
+        updateSimulation(resolution, resolution, nu);
+      }
       render(ctx, resolution, resolution);
       animationRef.current = requestAnimationFrame(animate);
     };
